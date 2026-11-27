@@ -1,0 +1,701 @@
+#########################################################################################################################
+#
+#   Main SCCS (Spring Cloud Config Server ) application file used to configure all sccs related configurations
+#
+#
+# Section: modelop:
+#     variables in this section
+#     gateway-url:                                              Internal entry point into MOC. should be left as http://gateway:8090
+#     ws-gateway-url:                                           Internal MOC websocket url for realtime webpage updates default should be ws://gateway:8090
+#     moc-center-url:                                           External Ingress backed Url for MOC. Your ingress should configure routes too gateway:8090. e.g. https://modelop-instance.dev.CompanyDomain.com
+#     eureka-url:                                               The internal k8 service to the MOC eureka registry service. Should be left as the default http://registry:8761
+#     mongodb-url:                                              The fully qualified MongoDB or DocumentDB connection string with port. e.g.
+#                                                               mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@my-db-instance.cluster-78tyhgsss.us-east-1.docdb.amazonaws.com:27017/MYDATABASE?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false
+#                                                               * Note: If a certificate is required to establish a secure connection to your backend database make sure to convert the .pem file to a .crt file like so:
+#                                                               openssl x509 -outform der -in rds-ca-2019-us-east-2.pem -out rds-ca-2019-us-east-2.crt
+#                                                               This certificate file should then be placed in the certs directory of the helm chart and helm will install it for you!
+#     zipkin-url:                                               The zipkin internal url. Should be left as the default value of http://zipkin:9411/
+#     jenkins-url:                                              Your companies official jenkins url instance that MOC will connect too. Can be left as the default if no jenkins connection is required.
+#     jenkins-user:                                             The Jenkins username, Jenkins-password: Password
+#     jira-url:                                                 This should be the external name of Jira
+#     jira-user:                                                Jira username default is: demo
+#     jira-password: <valeur>
+#     service-now-url:
+#     service-now-user:
+#     service-now-password:
+#     zammad-url:
+#     zammad-user:
+#     zammad-password:
+#     zammad-token:
+#     jupyter-url-base: jupyter:8888
+#     r-studio-url: http://rstudio:8787
+#     postgres-url:                                             The SQL connection string. We support H2, MySQL, postgres, Oracle, DB2, MSQL, MariaDB Databases. e.g. jdbc:postgresql://postgres:5432/camunda
+#     postgres-user:                                            The postgres username defaults too: postgres
+#     postgres-password: <valeur>
+#     dynatrace-url:
+#     dynatrace-token:
+#     gitlab-url:                                               Your gitlab url
+#     gitlab-user:                                              The gitlab  username. If an access token is used then no user is required.
+#     gitlab-password:                                          The gitlab password or access token
+#     mlc-output-asset-base-url                                 The base blob store url. For AWS: https://BUCKET_NAME.s3.REGION.amazonaws.com/ , for Azure  https://<storage-account-name>.blob.core.windows.net/<container-name>/,for GCP https://storage.googleapis.com/
+#
+#     *This configuration supports k8 secrets in replacement for clear text credentials. You would first create your secret then reference the secret via a ENV variable.
+#     For more information please go to:
+#     https://modelopdocs.atlassian.net/wiki/spaces/dv30/pages/1706688513/ModelOp+Center+Installation
+#
+######################################################################################################################
+modelop:
+  gateway-url: http://gateway:8090
+  ws-gateway-url: ws://gateway:8090
+  moc-center-url: ${modelop.gateway-url} # this should be the external name of MOC
+  eureka-url: http://registry:8761
+  mongodb-uri: mongodb://admin:${MOC_MONGODB_PASSWORD}@mongodb:27017/modelop?authSource=admin
+  zipkin-url: http://zipkin:9411/
+  jenkins-url: http://jenkins:8089
+  jenkins-user: modelop
+  jenkins-password: ${MOC_JENKINS_PASSWORD:}
+  jira-url: http://jira:8086 # this should be the external name of Jira
+  jira-user: demo
+  jira-password: ${MOC_JIRA_PASSWORD:}
+  service-now-url:
+  service-now-user:
+  service-now-password:
+  zammad-url:
+  zammad-user:
+  zammad-password:
+  zammad-token:
+  jupyter-url-base: jupyter:8888
+  r-studio-url: http://rstudio:8787
+  postgres-url: jdbc:postgresql://postgres:5432/camunda?currentSchema=public
+  postgres-user: postgres
+  postgres-password: ${MOC_POSTGRES_PASSWORD}
+  dynatrace-url:
+  dynatrace-token:
+  gitlab-url:
+  gitlab-user: # user is not required if using an access token
+  gitlab-password:
+  mlc-output-asset-base-url:                          #url of blob store for MLC's
+  use-case-stages: # Default setup for OOTB MLCS, sets use case and model stages on the ui and in model-manager
+    stages:
+      - Unmanaged
+      - Onboarding
+      - Development
+      - Reviews
+      - Validated
+      - Testing
+      - Production
+      - Retired
+  model-stages:
+    stages:
+      - Unmanaged
+      - Validation
+      - Production
+      - Retired
+    production-stage: Production
+
+###################################################################
+#
+#   Section: management
+#   Defaults are fine
+#
+####################################################################
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+
+###################################################################
+#
+#   Section: logging
+#   Specify the logging level for all of the services here.
+#   Valid enties are INFO, WARN, DEBUG
+#
+####################################################################
+logging:
+  level:
+    root: WARN
+    org.springframework.web: WARN
+    org.springframework.web.HttpLogging: WARN
+    org.springframework.security: WARN
+    org.springframework.security.oauth2: WARN
+    org.springframework.cloud.gateway: WARN
+    # This class logs every OptimisticLockingFailureException which makes the logs extremely noisy
+    #  these exceptions are expected and the class does not log other useful information
+    org.springframework.data.rest.webmvc.RepositoryRestExceptionHandler: OFF
+
+
+#####################################################################
+##  Default server settings
+#####################################################################
+server:
+  #Allows services to receive larger headers, useful when tokens are large or when users belong to hundreds of groups
+  max-http-header-size: 20KB
+  error:
+    include-message: always
+    include-binding-errors: always
+spring:
+  jackson:
+    default-property-inclusion: non_absent
+    serialization:
+      FAIL_ON_EMPTY_BEANS: false
+    deserialization:
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+eureka:
+  instance:
+    # hostname: ${spring.cloud.client.hostname}
+    instanceId: ${eureka.instance.hostname}:${spring.application.name}:${spring.application.instance_id:${server.port}}
+    non-secure-port-enabled: true
+    non-secure-port: ${server.port}
+    status-page-url: http://${eureka.instance.hostname}:${server.port}/actuator/info
+    health-check-url: http://${eureka.instance.hostname}:${server.port}/actuator/health
+    home-page-url: http://${eureka.instance.hostname}:${server.port}
+    intial-status: starting
+  client:
+    healthcheck:
+      enabled: true
+    service-url:
+      defaultZone: ${modelop.eureka-url}/eureka/
+modelManageAPI:
+  url: ${modelop.gateway-url}
+  name: model-manage
+modelManageAPIv2:
+  url: ${modelop.gateway-url}/model-manage/api
+  name: model-managev2
+engineAPI:
+  url: ${modelop.gateway-url}
+  name:
+engineV2API:
+  url: ${modelop.gateway-url}
+  name:
+metricsServiceAPI:
+  url: ${modelop.gateway-url}/metrics-service
+  name: metrics-service
+agentServiceAPI:
+  url: ${modelop.gateway-url}/agent-service
+reporting-service:
+  websocket:
+    url: ${modelop.ws-gateway-url}/reporting-service/messages
+    max-age: 600000
+camundaAPI:
+  url: ${modelop.gateway-url}/mlc-service/rest
+documentServiceAPI:
+  url: ${modelop.gateway-url}/document-service
+
+#####################################################################
+##  model-manage bucketInfoList setting options
+#####################################################################
+model-manage:
+  buckets:
+    bucketInfoList:
+      # Default storage type matching all groups for which there is no storage type configured
+      - group:
+        bucket: modelop
+        path:
+        storageType: S3_REPOSITORY
+
+#####################################################################
+##  # Configuration properties for the ticketing system(s) used Jira, SewrviceNow or Internal
+#####################################################################
+ticketing-systems:
+  enabled:
+    Jira:
+      due-date-field: "assignment.jiraIssueObject.Due Date"
+      priority-field: "assignment.jiraIssueObject.Priority"
+      priority-mappings:
+        Critical:
+          - "Highest"
+        High:
+          - "High"
+        Medium:
+          - "Medium"
+        Low:
+          - "Low"
+        Lowest:
+          - "Lowest"
+    ServiceNow:
+      due-date-field: "assignment.serviceNowIssueObject.Due Date"
+      priority-field: "assignment.serviceNowIssueObject.Priority"
+      priority-mappings:
+        Critical:
+          - "1 - Critical"
+        High:
+          - "2 - High"
+        Medium:
+          - "3 - Moderate"
+        Low:
+          - "4 - Low"
+        Lowest:
+          - "5 - Planning"
+    Internal:
+      due-date-field: "assignment.dueDate"
+      priority-field: "assignment.priority"
+      priority-mappings:
+        Critical:
+          - "Critical"
+        High:
+          - "High"
+        Medium:
+          - "Medium"
+        Low:
+          - "Low"
+        Lowest:
+          - "Lowest"
+
+---
+######################################################################
+##
+#   git_credentials Section
+#   Here you specify the git_credentials configurations.
+#
+#######################################################################
+spring:
+  config:
+    activate:
+      on-profile: "git_credentials"
+
+model-manage:
+  git:
+    storedCredentials:
+#      - context: https://github.com/                                          # Your git url
+#        username: ${GIT_USERNAME}                                             # Your git username as a secret env variable GIT_USERNAME. This can be set in your starter.yaml file under modelManage
+#        password: ${GIT_PASSWORD}                                             # Your git password as a secret env variable GIT_PASSWORD. This can be set in your starter.yaml file under modelManage
+#  config:
+#    credentials:
+#      useHttpPath: true
+
+---
+
+######################################################################
+##
+#   Enterprise Bucket Storage connection configuration section
+#
+#   Currently ModelOp Center supports both AWS S3 and Azure Blob Storage, as well as any S3-compliant bucket storage solution, such as MinIO.
+#   Configuring example for minio as the default bucket solution. p.s. in addition the minio-s3-client profile will need to be added as one of the profiles in your
+#   starter.yaml file for modelManager and mlcManager
+#   s3:
+#     s3-host: mino
+#     s3-accessKey: <valeur>
+#     s3-secretKey: <valeur>
+#     s3-port: 9000
+#     s3-secure: false
+#     s3-defaultBucket: modelop
+#     s3-region: default-region
+#
+#
+#
+#   Setting example for AWS s3 as the Default Bucket solution. For AWS s3 ModelOp Center supports username/password, accessKey/secretKey and Role based authentication mechanisms.
+#   p.s. in addition the aws-s3-client profile will need to be added as one of the profiles in your starter.yaml file for modelManager and mlcManager
+#   s3:
+#     s3-host:
+#     s3-accessKey: <valeur>
+#     s3-secretKey: <valeur>
+#     s3-port: 443
+#     s3-secure: true
+#     s3-defaultBucket: aws_bucket_name
+#     s3-region: aws_default-region
+#     server-side-encryption:                                                 # If server side encryption at rest is enabled add these 2 lines
+#       encryption:  'aws:kms'
+#   s3-credentials:                                                           # If authenticating with accesskey and secrets then add the storedCredentials: section else
+#      storedCredentials:                                                     # if Role based authentication then add the section eksServiceAccountCredentials:
+#          -path:
+#              accessKeyId: <valeur>
+#              secretAccessKey: <valeur>
+#              authenticationType: BASIC
+#      eksServiceAccountCredentials:
+#          -path:
+#          roleArn: ${AWS_ROLE_ARN}                                           # If a serviceaccountName is present under modelMange in your starter.yaml file then AWS should create this ENV variable for you.
+#          webIdentityTokenFile: ${AWS_WEB_IDENTITY_TOKEN_FILE}               # If a serviceaccountName is present under modelMange in your starter.yaml file then AWS should create this ENV variable for you.
+#          authenticationType: ASSUME_ROLE_WITH_WEB_IDENTITY                  # The authentication type that model-manage will use to authenticate for s3 bucket permissions. Should be left as ASSUME_ROLE_WITH_WEB_IDENTITY
+#
+#
+#   Setting example for Azure Blob Storage as the Default Bucket Solution. In addition one would also need to update the bucketInfoList in the model-manage.yaml file
+#
+#   external-file-repo-config:
+#     azure:
+#       azure-defaultStorageAccountName: <AZURE_STORAGE_ACCOUNT>
+#       azure-defaultStorageAccountKey: <valeur>
+#       azure-defaultBucket: modelop
+#     azure-credentials:
+#       storedCredentials:
+#         - storageAccountName: <AZURE_STORAGE_ACCOUNT>
+#           storageAccountKey: <valeur>
+#           path:
+#
+#
+#    P.S. The following edits would also need to be made in the model-manage.yaml file for Azure
+#    buckets:
+#      bucketInfoList:
+#        - group: ALL                                                       # The access group that this bucket location will be associated with. Defaults to the ALL group
+#          bucket: <AZURE_BUCKET_NAME>                                      # Enter in the azure Storage container name here
+#          path:
+#          storageType: AZURE_REPOSITORY                                    # The storage type to use leave as AZURE_REPOSITORY
+#
+#######################################################################
+spring:
+  config:
+    activate:
+      on-profile: "external_file_repo_config"
+
+external-file-repo-config:
+  s3:
+    s3-host: minio
+    s3-accessKey: ${MOC_S3_ACCESS_KEY}
+    s3-secretKey: ${MOC_S3_SECRET_KEY}
+    s3-port: 9000
+    s3-secure: false
+    s3-defaultBucket: modelop
+    s3-region: default-region
+  azure:
+    azure-defaultStorageAccountName: DEFAULT_STORAGE_ACCOUNTNAME
+    azure-defaultStorageAccountKey: DEFAULT_STORAGE_ACCOUNT_KEY
+    azure-defaultBucket: DEFAULT_BUCKET
+  azure-credentials:
+    storedCredentials:
+      - storageAccountName: DEFAULT_STORAGE_ACCOUNTNAME
+        storageAccountKey: DEFAULT_STORAGE_ACCOUNT_KEY
+        authenticationType: SHARED_KEY
+        path:
+
+---
+#######################################################################################################
+##
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   PingFederate OATH2 Section
+#   These values can be obtained from your PingFederate admin console once those clients are created.
+#   * To enable pingfederate the jwt and pingfederate profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,pingfederate,secured,jwt,...
+#
+#
+#  modelop:
+#    pingfederate-url: https://my.pingfederate.comapany.com
+#    pingfederate-internal-client-id: internal-client
+#    pingfederate-internal-client-secret: <valeur>
+#    pingfederate-external-client-id: external-integration-client
+#    pingfederate-cli-client-id: go-cli
+#    pingfederate-cli-client-secret: <valeur>
+#    pingfederate-gateway-client-id: gateway-service
+#    pingfederate-gateway-client-secret: <valeur>
+#
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <pingfederate-internal-client-secret>
+#    modelop.runtime.client-id:  <pingfederate-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "pingfederate"
+
+modelop:
+  pingfederate-url:
+  pingfederate-internal-client-id:
+  pingfederate-internal-client-secret:
+  pingfederate-external-client-id:
+  pingfederate-cli-client-id:
+  pingfederate-cli-client-secret:
+  pingfederate-gateway-client-id:
+  pingfederate-gateway-client-secret:
+  provider:
+    scope-claimname: scope
+    user-name-attribute: sub
+    enduser-claimname: Username
+    oauth2client-claimname: client_id
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: memberOf
+    admin-default-access-group: admin
+    items-list: false
+    default-access-groups: modelop
+    ootb-monitors-group: ALL
+
+---
+#######################################################################################################
+##
+#   Okta OATH2 Section
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   These values can be obtained from your Okta admin console once those clients are created.
+#   * To enable Okta the jwt and Okta profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,okta,secured,jwt,...
+#
+#   modelop:
+#     okta-url: https://my-company.okta.com
+#     okta-internal-client-id: internal-client
+#     okta-internal-client-secret: <valeur>
+#     okta-external-client-id: external-integration-client
+#     okta-cli-client-id: go-cli
+#     okta-cli-client-secret: <valeur>
+#     okta-gateway-client-id: gateway-service
+#     okta-gateway-client-secret: <valeur>
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <okta-internal-client-secret>
+#    modelop.runtime.client-id:  <okta-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "okta"
+
+modelop:
+  okta-url:
+  okta-internal-client-id:
+  okta-internal-client-secret:
+  okta-external-client-id:
+  okta-cli-client-id:
+  okta-cli-client-secret:
+  okta-gateway-client-id:
+  okta-gateway-client-secret:
+  provider:
+    scope-claimname: scp
+    user-name-attribute: sub
+    enduser-claimname: user_name
+    oauth2client-claimname: cid
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: memberOf
+    admin-default-access-group: admin
+    items-list: false
+    default-access-groups: modelop
+    ootb-monitors-group: ALL
+
+---
+#######################################################################################################
+##
+#   Here you specify the Keycloak oath2 configurations.
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   These values can be obtained from your Keycloak admin console once those clients are created.
+#   * To enable Keycloak the jwt and Keycloak profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,Keycloak,secured,jwt,...
+#
+#   modelop:
+#     keycloak-url: https://keycloak.my-company.center
+#     keycloak-internal-client-id: internal-client
+#     keycloak-internal-client-secret: <valeur>
+#     keycloak-external-client-id: external-integration-client
+#     keycloak-cli-client-id: go-cli
+#     keycloak-cli-client-secret: <valeur>
+#     keycloak-gateway-client-id: gateway-service
+#     keycloak-gateway-client-secret: <valeur>
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <keycloak-internal-client-secret>
+#    modelop.runtime.client-id:  <keycloak-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "keycloak"
+
+modelop:
+  keycloak-url:
+  keycloak-internal-client-id:
+  keycloak-internal-client-secret:
+  keycloak-external-client-id:
+  keycloak-cli-client-id:
+  keycloak-cli-client-secret:
+  keycloak-gateway-client-id:
+  keycloak-gateway-client-secret:
+  provider:
+    scope-claimname: scope
+    user-name-attribute: sub
+    enduser-claimname: user_name
+    oauth2client-claimname: clientId
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: memberOf
+    admin-default-access-group: admin
+    items-list: false
+    default-access-groups: modelop
+    ootb-monitors-group: ALL
+
+---
+#######################################################################################################
+##
+#   Here you specify the AWS Cognito oath2 configurations.
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   These values can be obtained from your Cognito admin console once those clients are created.
+#   * To enable Cognito the jwt and Cognito profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,cognito,secured,jwt,...
+#
+#   modelop:
+#     cognito-url: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123
+#     cognito-user-pool-domain-url: https://cog-my-company-com.auth.us-east-1.amazoncognito.com
+#     cognito-introspection-uri: https://bogus.example # placeholder
+#     cognito-internal-client-id: 345345345fgsdfgf
+#     cognito-internal-client-secret: <valeur>
+#     cognito-external-client-id: fsdgsdfggfdssgt4566456dffgds56456
+#     cognito-cli-client-id: ${modelop.cognito-internal-client-id}
+#     cognito-cli-client-secret: ${modelop.cognito-internal-client-secret}
+#     cognito-gateway-client-id: sfdgsfdg6567567gfhdh
+#     cognito-gateway-client-secret: <valeur>
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <cognito-internal-client-secret>
+#    modelop.runtime.client-id:  <cognito-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "cognito"
+
+modelop:
+  cognito-url:
+  cognito-user-pool-domain-url:
+  cognito-introspection-uri: https://bogus.example # placeholder
+  cognito-internal-client-id:
+  cognito-internal-client-secret:
+  cognito-external-client-id:
+  cognito-cli-client-id:
+  cognito-cli-client-secret:
+  cognito-gateway-client-id:
+  cognito-gateway-client-secret:
+  provider:
+    scope-claimname: scope
+    user-name-attribute: sub
+    enduser-claimname: username
+    oauth2client-claimname: client_id
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: "cognito:groups"
+    admin-default-access-group: admin
+    items-list: false
+    default-access-groups: modelop
+    ootb-monitors-group: ALL
+  resource-server:
+    base-conf:
+      claim-names:
+        givenName: given_name
+
+---
+#######################################################################################################
+##
+#   Microsoft azuread OATH2 Section
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   Here you specify the azuread oath2 configurations.
+#   * To enable azuread the jwt and azuread profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,azuread,secured,jwt,...
+#
+#   modelop:
+#     azuread-url: https://login.microsoftonline.com/my-ACCOUNT-GUID-ID-NUMBER
+#     azuread-internal-client-id: gdsfgdsfgdsf565-vbdfs5645
+#     azuread-internal-client-secret: <valeur>
+#     azuread-external-client-id: sdfgdsfg-5654566-45fsdgfse3-sfg-sfgsfg
+#     azuread-cli-client-id: 56456-7678-dghfh-89789-dgfhg
+#     azuread-cli-client-secret: <valeur>
+#     azuread-gateway-client-id: gfhdfg-dfghdgf-dgfhgf-b25c-dgfhdgfh
+#     azuread-gateway-client-secret: <valeur>
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <azuread-internal-client-secret>
+#    modelop.runtime.client-id:  <azuread-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "azuread"
+
+modelop:
+  moc-center-url: https://modelop.exemple.ca
+  azuread-url: https://login.microsoftonline.com/495929eb-f078-464d-b6ef-e9fe18c31e12
+  azuread-internal-client-id: b77b02f2-b71c-4962-9814-e5ac70df03d5
+  azuread-internal-client-secret: ${ENTRA_INTERNAL_CLIENT_SECRET}
+  azuread-external-client-id:
+  azuread-cli-client-id:
+  azuread-cli-client-secret:
+  azuread-gateway-client-id: 0c7bdf16-df2d-4e47-938a-e885f2baad49
+  azuread-gateway-client-secret: ${ENTRA_GATEWAY_CLIENT_SECRET}
+  provider:
+    scope-claimname: roles
+    user-name-attribute: sub
+    enduser-claimname: preferred_username
+    oauth2client-claimname: idtyp
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: groups
+    admin-default-access-group:
+    items-list: false
+    default-access-groups:
+    groups-url: https://graph.microsoft.com/v1.0/groups
+    groups-poll-rate: 86400000
+    ootb-monitors-group: ALL
+
+---
+#######################################################################################################
+##
+#   SSO adapter for ForgeRock and similar SSO
+#   ModelOp Center integrates with Oauth2 to enable enterprise-grade authentication and access control
+#   Here you specify the SSO Adapter oath2 configurations.
+#   * To enable ssoadapter the jwt and ssoadapter profiles should be added in your starter file for all of the core services for profile:
+#   e.g. profile: ...,ssoadapter,secured,jwt,...
+#
+#   modelop:
+#     ssoadapter-url:
+#     ssoadapter-internal-client-id: internal-client
+#     ssoadapter-internal-client-secret: <valeur>
+#     ssoadapter-external-client-id: external-integration-client
+#     ssoadapter-cli-client-id: go-cli
+#     ssoadapter-cli-client-secret: <valeur>
+#     ssoadapter-gateway-client-id: gateway-service
+#     ssoadapter-gateway-client-secret: <valeur>
+#
+#
+#  *Note in addition to configuring the above the following would also need to be present in your starter.yaml file
+#  commonRuntimeEnv:
+#    modelop.runtime.client-secret: <ssoadapter-internal-client-secret>
+#    modelop.runtime.client-id:  <ssoadapter-internal-client-id>
+#
+#######################################################################################################
+spring:
+  config:
+    activate:
+      on-profile: "ssoadapter"
+
+modelop:
+  ssoadapter-url:
+  ssoadapter-internal-client-id: internal-client
+  ssoadapter-internal-client-secret:
+  ssoadapter-external-client-id: external-integration-client
+  ssoadapter-cli-client-id: go-cli
+  ssoadapter-cli-client-secret:
+  ssoadapter-gateway-client-id: gateway-service
+  ssoadapter-gateway-client-secret:
+  provider:
+    scope-claimname: scope
+    user-name-attribute: sub
+    enduser-claimname: uid
+    oauth2client-claimname: cid
+
+  idp:
+    metadata-uri:
+    on-successful-logout-redirect-to: ${modelop.moc-center-url}/logoutModelOp
+    saml:
+      required-attribute-names:
+        groups-attribute: groups
+        given-name-attribute: uid
+        created-by-attribute: givenName
+        user-id-attribute: uid
+
+oauth2:
+  group-base-access:
+    oauth2-group-claim-name: memberOf
+    admin-default-access-group: admin
+    items-list: false
+    default-access-groups:
+    ootb-monitors-group: ALL

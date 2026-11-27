@@ -1,0 +1,26 @@
+# Remplacer ingress-interne par la classe du contrôleur ingress d'AKS.
+# Le contrôleur termine TLS et transmet les en-têtes X-Forwarded-Host et X-Forwarded-Proto.
+# Le Secret modelop-tls doit contenir le certificat et la clé du nom DNS publié.
+# URI de retour Web Entra : https://modelop.exemple.ca/login/oauth2/code/gateway-service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: modelop
+  namespace: modelop-gateway-poc
+spec:
+  ingressClassName: ingress-interne
+  tls:
+    - hosts:
+        - modelop.exemple.ca
+      secretName: modelop-tls
+  rules:
+    - host: modelop.exemple.ca
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8090

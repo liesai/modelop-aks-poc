@@ -1,0 +1,154 @@
+# Valeurs AKS pour la copie du chart ModelOp 3.5 utilisée dans le POC.
+# Copier application.yaml dans moc/sccs/ de cette copie du chart.
+# SCCS charge application.yaml et le profil azure-data-poc via une ConfigMap.
+# Appliquer ingress.yaml dans le même namespace que le chart Helm.
+# Adapter les noms DNS, les ressources Azure et les deux identifiants du SP Blob.
+# Fournir les Secrets Kubernetes référencés avant de déployer.
+# Le runtime Python 3.5 garde sa configuration et requiert une clé pour ses accès directs à Blob.
+moc:
+  namespace: modelop-gateway-poc
+  version: '3.5'
+  imageTagSuffix: -rhel8
+  profile: base_secured,secured,jwt,azuread
+  services:
+  - core
+  - sccs
+  - metrics-service
+  - runtimes
+  image:
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  gateway:
+    serviceType: ClusterIP
+    env:
+      server.forward-headers-strategy: framework
+    secrets:
+      ENTRA_GATEWAY_CLIENT_SECRET:
+        from: modelop-entra-gateway
+        key: gateway-client-secret
+      ENTRA_INTERNAL_CLIENT_SECRET:
+        from: modelop-entra-gateway
+        key: internal-client-secret
+    profiles: azuread-groups
+  modelManager:
+    resources:
+      requests:
+        memory: 1050Mi
+      limits:
+        memory: 1850Mi
+    env:
+      JVM_MEMORY_PERCENTAGE: '40.0'
+      AZURE_TENANT_ID: &blobSpTenantId "<ID-du-tenant-Entra>"
+      AZURE_CLIENT_ID: &blobSpClientId "<ID-application-du-SP-Blob>"
+    secrets:
+      ENTRA_INTERNAL_CLIENT_SECRET: &id001
+        from: modelop-entra-gateway
+        key: internal-client-secret
+      AZURE_CLIENT_SECRET: &blobSpSecret
+        from: modelop-blob-sp
+        key: client-secret
+      MOC_DOCUMENTDB_PASSWORD_URLENCODED:
+        from: modelop-azure-storage
+        key: documentdb-password-urlencoded
+    profiles: azure-blob-storage-client,azure-data-poc
+  mlcManager:
+    resources:
+      requests:
+        memory: 850Mi
+      limits:
+        memory: 1500Mi
+    env:
+      JVM_MEMORY_PERCENTAGE: '38.0'
+      AZURE_TENANT_ID: *blobSpTenantId
+      AZURE_CLIENT_ID: *blobSpClientId
+      spring.datasource.url: "jdbc:sqlserver://sql-modelop-poc-001.database.windows.net:1433;databaseName=modelop_camunda;encrypt=true;trustServerCertificate=false;loginTimeout=10"
+      spring.datasource.driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      spring.datasource.username: modelop_mlc
+      camunda.bpm.database.schema-update: 'true'
+    secrets:
+      ENTRA_INTERNAL_CLIENT_SECRET: *id001
+      spring.datasource.password:
+        from: modelop-mlc-sqlserver
+        key: password
+      AZURE_CLIENT_SECRET: *blobSpSecret
+    profiles: azure-blob-storage-client,azure-data-poc
+  documentService:
+    resources:
+      requests:
+        memory: 350Mi
+      limits:
+        memory: 750Mi
+    env:
+      JVM_MEMORY_PERCENTAGE: '32.0'
+    secrets:
+      ENTRA_INTERNAL_CLIENT_SECRET: *id001
+  reportingService:
+    resources:
+      requests:
+        memory: 400Mi
+      limits:
+        memory: 900Mi
+    env:
+      JVM_MEMORY_PERCENTAGE: '33.0'
+    secrets:
+      ENTRA_INTERNAL_CLIENT_SECRET: *id001
+  metricsService:
+    resources:
+      requests:
+        memory: 450Mi
+      limits:
+        memory: 950Mi
+    env:
+      JVM_MEMORY_PERCENTAGE: '35.0'
+    secrets:
+      ENTRA_INTERNAL_CLIENT_SECRET: *id001
+  commonRuntimeSecrets:
+    ENTRA_INTERNAL_CLIENT_SECRET: *id001
+    modelop.runtime.client-secret: *id001
+  commonRuntimeEnv:
+    modelop.runtime.client-id: b77b02f2-b71c-4962-9814-e5ac70df03d5
+  runtimes:
+    '1':
+      resources:
+        requests:
+          memory: 650Mi
+        limits:
+          memory: 1550Mi
+      env:
+        modelop.runtime.initial-tags: default
+        modelop.runtime.group: ALL
+      configMaps:
+        modelop-poc-runtime-compat:
+          mountPath: /fastscore/lib/engine-0.0.0+build.2243.ref92eccb5/priv/platform_capabilities/python_platform_info.py3
+          subPath: python_platform_info.py3
+          defaultMode: 493
+      profiles: azure-data-poc
+  configMaps:
+    modelop-poc-runtime-compat: poc-runtime-compat/*
+  sccs:
+    backedBy: configmap
+    inlineConfig:
+      application-azure-data-poc.yaml: |
+        modelop:
+          mongodb-uri: "mongodb+srv://modelop_app:${MOC_DOCUMENTDB_PASSWORD_URLENCODED}@docdb-modelop-aks-001.mongocluster.cosmos.azure.com/modelop?tls=true&authSource=admin&authMechanism=SCRAM-SHA-256&retryWrites=false&maxIdleTimeMS=120000"
+          mlc-output-asset-base-url: https://stmodelopaks001.blob.core.windows.net/modelop-artifacts/
+
+        external-file-repo-config:
+          azure:
+            azure-defaultStorageAccountName: stmodelopaks001
+            azure-defaultStorageAccountKey: ""
+            azure-defaultBucket: modelop-artifacts
+          azure-credentials:
+            storedCredentials:
+              - storageAccountName: stmodelopaks001
+                storageAccountKey: ""
+                authenticationType: MANAGED_IDENTITY
+                path: ""
+
+        model-manage:
+          buckets:
+            bucketInfoList:
+              - group: ""
+                bucket: modelop-artifacts
+                path: ""
+                storageType: AZURE_REPOSITORY
